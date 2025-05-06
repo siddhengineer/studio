@@ -47,6 +47,8 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
     case 'ADD_TASK': {
       const newTask: Task = {
         ...action.payload,
+        // Ensure dueDate is stored as ISO string if it exists
+        dueDate: action.payload.dueDate instanceof Date ? action.payload.dueDate.toISOString() : action.payload.dueDate,
         id: uuidv4(),
         isCompleted: false,
         createdAt: new Date().toISOString(),
@@ -57,8 +59,18 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, tasks: updatedTasks };
     }
     case 'EDIT_TASK': {
+      const payloadDueDate = action.payload.dueDate;
+      // Ensure dueDate in the payload is converted to ISO string if it's a Date object
+      const dueDateString = payloadDueDate
+        ? (payloadDueDate instanceof Date ? payloadDueDate.toISOString() : payloadDueDate)
+        : undefined;
+
       const updatedTasks = state.tasks.map(task =>
-        task.id === action.payload.id ? { ...action.payload, updatedAt: new Date().toISOString() } : task
+        task.id === action.payload.id ? { 
+            ...action.payload, 
+            dueDate: dueDateString,
+            updatedAt: new Date().toISOString() 
+        } : task
       );
       localStorage.setItem('tasks', JSON.stringify(updatedTasks));
       return { ...state, tasks: updatedTasks };
@@ -148,3 +160,4 @@ export const useAppContext = () => {
   }
   return context;
 };
+
