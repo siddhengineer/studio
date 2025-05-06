@@ -8,7 +8,7 @@ import { format, parseISO, isSameDay } from 'date-fns';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { CalendarDays, ListChecks } from 'lucide-react';
+import { CalendarDays, ListChecks, History } from 'lucide-react'; // Added History import
 
 export default function TimelineView() {
   const { state } = useAppContext();
@@ -110,3 +110,4 @@ export default function TimelineView() {
     </Card>
   );
 }
+
