@@ -2,7 +2,7 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutGrid, Settings, ListChecks, PlusCircle } from 'lucide-react';
+import { Home, LayoutGrid, Settings, ListChecks, PlusCircle, History } from 'lucide-react'; // Added History
 import {
   SidebarHeader,
   SidebarContent,
@@ -27,6 +27,7 @@ export default function AppSidebar() {
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
+    { href: '/timeline', label: 'Timeline', icon: History }, // Added Timeline
     { href: '/categories', label: 'Categories', icon: LayoutGrid },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
@@ -43,7 +44,8 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="p-0">
-        <ScrollArea className="h-[calc(100%-8rem)]"> {/* Adjust height as needed */}
+        {/* Adjusted height to account for potential footer/bottom nav in other views if sidebar was visible. */}
+        <ScrollArea className="h-[calc(100%-8rem)]"> 
         <SidebarGroup>
           <SidebarMenu>
             {navItems.map((item) => (
@@ -80,7 +82,8 @@ export default function AppSidebar() {
             <SidebarMenuItem>
                <SidebarMenuButton
                   onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: null })}
-                  isActive={state.selectedCategoryId === null && pathname === '/'}
+                  // Active if on home page AND no category selected
+                  isActive={state.selectedCategoryId === null && pathname === '/'} 
                   tooltip={{ children: 'All Tasks', side: 'right', align: 'center' }}
                 >
                   <ListChecks />
@@ -91,6 +94,7 @@ export default function AppSidebar() {
               <SidebarMenuItem key={category.id}>
                 <SidebarMenuButton
                   onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: category.id })}
+                   // Active if on home page AND this category selected
                   isActive={state.selectedCategoryId === category.id && pathname === '/'}
                   tooltip={{ children: category.name, side: 'right', align: 'center' }}
                 >
