@@ -1,3 +1,4 @@
+
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -15,9 +16,10 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
-import AddTaskDialog from '@/components/tasks/AddTaskDialog'; // Will create this
-import AddCategoryDialog from '@/components/categories/AddCategoryDialog'; // Will create this
+import AddTaskDialog from '@/components/tasks/AddTaskDialog'; 
+import AddCategoryDialog from '@/components/categories/AddCategoryDialog'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 export default function AppSidebar() {
   const pathname = usePathname();
