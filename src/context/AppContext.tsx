@@ -1,4 +1,3 @@
-
 "use client"; // This directive is not used in React Native but kept for consistency if snippets are reused.
 import type { Task, Category, TaskFilter } from '@/types';
 import React, { createContext, useContext, useReducer, ReactNode, useEffect, useCallback } from 'react';
@@ -27,7 +26,8 @@ type AppAction =
   | { type: 'SET_TASK_FILTER'; payload: TaskFilter }
   | { type: 'LOAD_DATA'; payload: { tasks: Task[]; categories: Category[] } }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'TOGGLE_THEME' };
+  | { type: 'TOGGLE_THEME' }
+  | { type: 'SET_THEME'; payload: 'light' | 'dark' }; // New action for setting theme directly
 
 const initialState: AppState = {
   tasks: [],
@@ -128,6 +128,10 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       AsyncStorage.setItem('theme', newTheme);
       return { ...state, theme: newTheme };
     }
+    case 'SET_THEME': { // Handle new action
+      AsyncStorage.setItem('theme', action.payload);
+      return { ...state, theme: action.payload };
+    }
     default:
       return state;
   }
@@ -152,10 +156,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
         
         dispatch({ type: 'LOAD_DATA', payload: { tasks, categories } });
-        if (storedTheme) {
-          if (state.theme !== storedTheme) { // only dispatch if different from initial
-             dispatch({ type: 'TOGGLE_THEME' }); // This will set it to the opposite then back if needed, better to have a SET_THEME
-          }
+        
+        if (storedTheme && state.theme !== storedTheme) { // Use SET_THEME
+           dispatch({ type: 'SET_THEME', payload: storedTheme });
         }
 
       } catch (error) {
@@ -167,7 +170,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     loadData();
-  }, []);
+  }, []); // state.theme removed from dependencies to prevent loop, initial load only
 
   const getFilteredTasks = useCallback(() => {
     let tasksToFilter = state.tasks;
