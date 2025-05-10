@@ -1,7 +1,10 @@
-"use client";
+
+"use client"; // This directive is not used in React Native but kept for consistency if snippets are reused.
 import type { Task, Category, TaskFilter } from '@/types';
 import React, { createContext, useContext, useReducer, ReactNode, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initialCategories } from '@/data/initialData'; // Import initial categories
 
 interface AppState {
   tasks: Task[];
@@ -9,6 +12,7 @@ interface AppState {
   selectedCategoryId: string | null;
   taskFilter: TaskFilter;
   isLoading: boolean;
+  theme: 'light' | 'dark';
 }
 
 type AppAction =
@@ -17,21 +21,21 @@ type AppAction =
   | { type: 'DELETE_TASK'; payload: string }
   | { type: 'TOGGLE_TASK_COMPLETION'; payload: string }
   | { type: 'ADD_CATEGORY'; payload: Omit<Category, 'id'> }
+  | { type: 'EDIT_CATEGORY'; payload: Category } // Added for category editing
+  | { type: 'DELETE_CATEGORY'; payload: string } // Added for category deletion
   | { type: 'SET_SELECTED_CATEGORY'; payload: string | null }
   | { type: 'SET_TASK_FILTER'; payload: TaskFilter }
   | { type: 'LOAD_DATA'; payload: { tasks: Task[]; categories: Category[] } }
-  | { type: 'SET_LOADING'; payload: boolean };
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'TOGGLE_THEME' };
 
 const initialState: AppState = {
   tasks: [],
-  categories: [
-    { id: 'personal', name: 'Personal', color: 'hsl(var(--chart-1))' },
-    { id: 'work', name: 'Work', color: 'hsl(var(--chart-2))' },
-    { id: 'shopping', name: 'Shopping', color: 'hsl(var(--chart-4))' },
-  ],
+  categories: initialCategories,
   selectedCategoryId: null,
   taskFilter: 'active',
   isLoading: true,
+  theme: 'light', // Default theme
 };
 
 const AppContext = createContext<{
@@ -43,11 +47,15 @@ const AppContext = createContext<{
 const appReducer = (state: AppState, action: AppAction): AppState => {
   switch (action.type) {
     case 'LOAD_DATA':
-      return { ...state, tasks: action.payload.tasks, categories: action.payload.categories, isLoading: false };
+      return { 
+        ...state, 
+        tasks: action.payload.tasks, 
+        categories: action.payload.categories.length > 0 ? action.payload.categories : initialCategories, // Ensure initial categories if empty
+        isLoading: false 
+      };
     case 'ADD_TASK': {
       const newTask: Task = {
         ...action.payload,
-        // Ensure dueDate is stored as ISO string if it exists
         dueDate: action.payload.dueDate instanceof Date ? action.payload.dueDate.toISOString() : action.payload.dueDate,
         id: uuidv4(),
         isCompleted: false,
@@ -55,12 +63,11 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         updatedAt: new Date().toISOString(),
       };
       const updatedTasks = [...state.tasks, newTask];
-      localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+      AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
       return { ...state, tasks: updatedTasks };
     }
     case 'EDIT_TASK': {
       const payloadDueDate = action.payload.dueDate;
-      // Ensure dueDate in the payload is converted to ISO string if it's a Date object
       const dueDateString = payloadDueDate
         ? (payloadDueDate instanceof Date ? payloadDueDate.toISOString() : payloadDueDate)
         : undefined;
@@ -72,26 +79,43 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
             updatedAt: new Date().toISOString() 
         } : task
       );
-      localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+      AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
       return { ...state, tasks: updatedTasks };
     }
     case 'DELETE_TASK': {
       const updatedTasks = state.tasks.filter(task => task.id !== action.payload);
-      localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+      AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
       return { ...state, tasks: updatedTasks };
     }
     case 'TOGGLE_TASK_COMPLETION': {
       const updatedTasks = state.tasks.map(task =>
         task.id === action.payload ? { ...task, isCompleted: !task.isCompleted, updatedAt: new Date().toISOString() } : task
       );
-      localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+      AsyncStorage.setItem('tasks', JSON.stringify(updatedTasks));
       return { ...state, tasks: updatedTasks };
     }
     case 'ADD_CATEGORY': {
       const newCategory: Category = { ...action.payload, id: uuidv4() };
       const updatedCategories = [...state.categories, newCategory];
-      localStorage.setItem('categories', JSON.stringify(updatedCategories));
+      AsyncStorage.setItem('categories', JSON.stringify(updatedCategories));
       return { ...state, categories: updatedCategories };
+    }
+    case 'EDIT_CATEGORY': {
+      const updatedCategories = state.categories.map(cat =>
+        cat.id === action.payload.id ? action.payload : cat
+      );
+      AsyncStorage.setItem('categories', JSON.stringify(updatedCategories));
+      return { ...state, categories: updatedCategories };
+    }
+    case 'DELETE_CATEGORY': {
+      // Also update tasks that belong to the deleted category
+      const tasksWithClearedCategory = state.tasks.map(task => 
+        task.categoryId === action.payload ? { ...task, categoryId: '' } : task // Set to empty or a default category ID
+      );
+      const updatedCategories = state.categories.filter(cat => cat.id !== action.payload);
+      AsyncStorage.setItem('categories', JSON.stringify(updatedCategories));
+      AsyncStorage.setItem('tasks', JSON.stringify(tasksWithClearedCategory));
+      return { ...state, categories: updatedCategories, tasks: tasksWithClearedCategory };
     }
     case 'SET_SELECTED_CATEGORY':
       return { ...state, selectedCategoryId: action.payload };
@@ -99,6 +123,11 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, taskFilter: action.payload };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
+    case 'TOGGLE_THEME': {
+      const newTheme = state.theme === 'light' ? 'dark' : 'light';
+      AsyncStorage.setItem('theme', newTheme);
+      return { ...state, theme: newTheme };
+    }
     default:
       return state;
   }
@@ -108,46 +137,56 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   useEffect(() => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    try {
-      const storedTasks = localStorage.getItem('tasks');
-      const storedCategories = localStorage.getItem('categories');
-      
-      const tasks = storedTasks ? JSON.parse(storedTasks) : initialState.tasks;
-      // Ensure initial categories are loaded if none in local storage
-      const categories = storedCategories ? JSON.parse(storedCategories) : initialState.categories;
-      
-      dispatch({ type: 'LOAD_DATA', payload: { tasks, categories } });
+    const loadData = async () => {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      try {
+        const storedTasks = await AsyncStorage.getItem('tasks');
+        const storedCategories = await AsyncStorage.getItem('categories');
+        const storedTheme = await AsyncStorage.getItem('theme') as 'light' | 'dark' | null;
+        
+        const tasks = storedTasks ? JSON.parse(storedTasks) : [];
+        let categories = storedCategories ? JSON.parse(storedCategories) : initialCategories;
+        if (categories.length === 0 && initialCategories.length > 0) {
+          categories = initialCategories; // Ensure initial categories are loaded if storage is empty or corrupted
+          await AsyncStorage.setItem('categories', JSON.stringify(categories));
+        }
+        
+        dispatch({ type: 'LOAD_DATA', payload: { tasks, categories } });
+        if (storedTheme) {
+          if (state.theme !== storedTheme) { // only dispatch if different from initial
+             dispatch({ type: 'TOGGLE_THEME' }); // This will set it to the opposite then back if needed, better to have a SET_THEME
+          }
+        }
 
-      // If no categories in local storage, set the initial ones
-      if (!storedCategories) {
-        localStorage.setItem('categories', JSON.stringify(initialState.categories));
+      } catch (error) {
+        console.error("Failed to load data from AsyncStorage", error);
+        // Load with initial state in case of error
+        dispatch({ type: 'LOAD_DATA', payload: { tasks: [], categories: initialCategories } });
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
-
-    } catch (error) {
-      console.error("Failed to load data from localStorage", error);
-      dispatch({ type: 'LOAD_DATA', payload: { tasks: initialState.tasks, categories: initialState.categories } });
-    }
+    };
+    loadData();
   }, []);
 
-  const filteredTasks = useCallback(() => {
-    let tasks = state.tasks;
+  const getFilteredTasks = useCallback(() => {
+    let tasksToFilter = state.tasks;
     if (state.selectedCategoryId) {
-      tasks = tasks.filter(task => task.categoryId === state.selectedCategoryId);
+      tasksToFilter = tasksToFilter.filter(task => task.categoryId === state.selectedCategoryId);
     }
     switch (state.taskFilter) {
       case 'active':
-        return tasks.filter(task => !task.isCompleted);
+        return tasksToFilter.filter(task => !task.isCompleted);
       case 'completed':
-        return tasks.filter(task => task.isCompleted);
+        return tasksToFilter.filter(task => task.isCompleted);
       case 'all':
       default:
-        return tasks;
+        return tasksToFilter;
     }
   }, [state.tasks, state.selectedCategoryId, state.taskFilter]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, filteredTasks: filteredTasks() }}>
+    <AppContext.Provider value={{ state, dispatch, filteredTasks: getFilteredTasks() }}>
       {children}
     </AppContext.Provider>
   );
@@ -160,4 +199,3 @@ export const useAppContext = () => {
   }
   return context;
 };
-
